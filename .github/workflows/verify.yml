@@ -25,7 +25,9 @@ jobs:
           python -m compileall -q app tests
           python -m pytest -q tests/test_contract.py
       - name: Start PostgreSQL, API, worker and helpdesk mock
-        run: docker compose up --build -d
+        run: |
+          cp .env.example .env
+          docker compose up --build -d
       - name: Wait for HTTP readiness
         run: |
           python - <<'PY'

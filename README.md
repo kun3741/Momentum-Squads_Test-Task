@@ -11,7 +11,7 @@
 ## Запуск
 
 1. Скопіюйте `.env.example` в `.env`. Для локальної перевірки можна лишити значення за замовчуванням. Перед публічним доступом задайте випадкові `POSTGRES_PASSWORD`, `OPERATOR_PASSWORD` і `WEBHOOK_SECRET` та HTTPS-адресу `PUBLIC_BASE_URL`.
-2. Виконайте `docker compose up --build -d` у корені репозиторію.
+2. Виконайте `docker compose up --build -d` у корені репозиторію. Без `.env` Compose не запуститься: три основні секрети обов'язкові.
 3. Перевірте `http://localhost:8000/health`: відповідь має бути `200 OK` з тілом `OK`.
 4. Відкрийте `http://localhost:8000/`. HTTP Basic авторизація: користувач `operator`, пароль з `OPERATOR_PASSWORD` (локально `change-me`).
 5. Логи: `docker compose logs -f api worker mock-helpdesk`. Зупинка: `docker compose down`. Дані PostgreSQL лишаються в томі `pgdata`; `docker compose down -v` видалить їх.
@@ -41,7 +41,7 @@ Invoke-RestMethod -Uri http://localhost:8000/webhooks/helpdesk -Method Post -Con
 Invoke-RestMethod -Uri http://localhost:8001/replies -Headers @{ 'X-Mock-Admin-Secret' = 'local-webhook-secret' }
 ```
 
-Порт мока відкритий лише на `127.0.0.1` хоста. Відповідь не надсилається реальній людині.
+Порти API й мока відкриті лише на `127.0.0.1` хоста. Відповідь не надсилається реальній людині.
 
 ## API
 
@@ -84,4 +84,4 @@ GitHub Actions запускає ці перевірки та інтеграці�
 
 ## Підготовка до VPS
 
-Для публічного тунельного домену задайте `PUBLIC_BASE_URL` як HTTPS-адресу тунелю, замініть усі прикладові паролі й секрети, обмежте доступ до операторського інтерфейсу та забезпечте резервне копіювання тому PostgreSQL. `HELPDESK_ALLOWED_ORIGIN` за замовчуванням вказує на внутрішній мок. Деплой на VPS і налаштування тунелю виконуються окремим етапом після рев'ю.
+Для публічного тунельного домену задайте `PUBLIC_BASE_URL` як HTTPS-адресу тунелю, замініть усі прикладові паролі й секрети, обмежте доступ до операторського інтерфейсу та забезпечте резервне копіювання тому PostgreSQL. `HELPDESK_ALLOWED_ORIGIN` за замовчуванням вказує на внутрішній мок. Опціональний профіль `tunnel` запускає ngrok із безкоштовним стабільним dev-доменом облікового запису. Докладні кроки та виявлені обмеження поточного VPS описані в [DEPLOY_VPS.md](DEPLOY_VPS.md). Деплой на VPS ще не виконаний.

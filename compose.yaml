@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: support
       POSTGRES_USER: support
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,16 +15,16 @@ services:
     build: .
     command: python -m app.init
     environment:
-      DATABASE_URL: postgresql+psycopg://support:${POSTGRES_PASSWORD:-localdev}@db:5432/support
+      DATABASE_URL: postgresql+psycopg://support:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/support
     depends_on:
       db:
         condition: service_healthy
   api:
     build: .
     environment: &env
-      DATABASE_URL: postgresql+psycopg://support:${POSTGRES_PASSWORD:-localdev}@db:5432/support
-      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-change-me}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-local-webhook-secret}
+      DATABASE_URL: postgresql+psycopg://support:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/support
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:?Set OPERATOR_PASSWORD in .env}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET in .env}
       HELPDESK_ALLOWED_ORIGIN: ${HELPDESK_ALLOWED_ORIGIN:-http://mock-helpdesk:8001}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
@@ -33,7 +33,7 @@ services:
       MOCK_LLM_DELAY_MAX: ${MOCK_LLM_DELAY_MAX:-30}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-32}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       init:
         condition: service_completed_successfully
@@ -55,6 +55,15 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    restart: unless-stopped
+  ngrok:
+    image: ngrok/ngrok:latest
+    profiles: ["tunnel"]
+    command: ["http", "api:8000"]
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    depends_on:
+      - api
     restart: unless-stopped
 volumes:
   pgdata:
