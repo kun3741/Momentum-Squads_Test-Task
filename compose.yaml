@@ -25,7 +25,7 @@ services:
       DATABASE_URL: postgresql+psycopg://support:${POSTGRES_PASSWORD:-localdev}@db:5432/support
       OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-change-me}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-local-webhook-secret}
-      HELPDESK_ALLOWED_ORIGIN: http://mock-helpdesk:8001
+      HELPDESK_ALLOWED_ORIGIN: ${HELPDESK_ALLOWED_ORIGIN:-http://mock-helpdesk:8001}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}

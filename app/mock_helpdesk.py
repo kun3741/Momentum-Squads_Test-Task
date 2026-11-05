@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from .db import MockReply, MockScenario, SessionLocal, init_db
+from .db import MockReply, MockScenario, SessionLocal
 
 app = FastAPI(title="Mock helpdesk")
 
@@ -20,11 +20,6 @@ class ScenarioIn(BaseModel):
     mode: str
 
 
-@app.on_event("startup")
-def startup():
-    init_db()
-
-
 @app.post("/tickets/{ticket_id}/replies", status_code=201)
 def create_reply(ticket_id: str, body: ReplyIn, idempotency_key: str = Header(alias="Idempotency-Key")):
     if body.ticket_id != ticket_id:
@@ -34,13 +29,16 @@ def create_reply(ticket_id: str, body: ReplyIn, idempotency_key: str = Header(al
         if scenario and scenario.mode == "500":
             raise HTTPException(503, "Injected failure")
         stmt = insert(MockReply).values(ticket_id=ticket_id, idempotency_key=idempotency_key, message=body.message).on_conflict_do_nothing(index_elements=["ticket_id", "idempotency_key"])
-        db.execute(stmt)
+        inserted = db.execute(stmt.returning(MockReply.id)).scalar_one_or_none()
         prior = db.scalar(select(MockReply).where(MockReply.ticket_id == ticket_id, MockReply.idempotency_key == idempotency_key))
         if prior.message != body.message:
             raise HTTPException(409, "Idempotency key used with different message")
-        if scenario and scenario.mode == "timeout-after-write":
-            time.sleep(12)
-    return {"id": prior.id, "duplicate": False}
+        timeout_after_write = bool(scenario and scenario.mode == "timeout-after-write")
+        duplicate = inserted is None
+        reply_id = prior.id
+    if timeout_after_write:
+        time.sleep(12)
+    return {"id": reply_id, "duplicate": duplicate}
 
 
 @app.put("/scenarios/{ticket_id}")

@@ -77,10 +77,15 @@ def retry(ticket_pk, token, stage, error, delay=None):
         ticket.lease_token = None
 
 
-def valid_reply_url(url):
-    parsed = urlsplit(url)
-    allowed = urlsplit(os.getenv("HELPDESK_ALLOWED_ORIGIN", "http://mock-helpdesk:8001"))
-    return (parsed.scheme, parsed.hostname, parsed.port) == (allowed.scheme, allowed.hostname, allowed.port) and not parsed.username and not parsed.password and parsed.path.startswith("/tickets/")
+def valid_reply_url(url, ticket_id):
+    try:
+        parsed = urlsplit(url)
+        allowed = urlsplit(os.getenv("HELPDESK_ALLOWED_ORIGIN", "http://mock-helpdesk:8001"))
+        return ((parsed.scheme, parsed.hostname, parsed.port) == (allowed.scheme, allowed.hostname, allowed.port)
+                and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+                and parsed.path == f"/tickets/{ticket_id}/replies")
+    except ValueError:
+        return False
 
 
 def process(job):
@@ -94,7 +99,7 @@ def process(job):
             answer = generate(message, articles)
             complete(ticket_pk, token, stage, answer, ",".join(str(item[1]) for item in articles))
         else:
-            if not valid_reply_url(reply_url):
+            if not valid_reply_url(reply_url, ticket_id):
                 raise ValueError("Reply URL origin is not allowed")
             response = httpx.post(reply_url, json={"ticket_id": ticket_id, "message": draft}, headers={"Idempotency-Key": f"reply:{ticket_id}"}, timeout=5)
             if response.status_code != 201:
