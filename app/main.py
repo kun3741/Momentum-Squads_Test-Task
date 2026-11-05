@@ -1,4 +1,5 @@
 import hmac
+import logging
 import os
 from hashlib import sha256
 from html import escape
@@ -8,13 +9,15 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import SQLAlchemyError
 
 from .db import Article, Event, SessionLocal, Ticket, now
 
 app = FastAPI(title="Orbita support drafts")
 security = HTTPBasic()
+log = logging.getLogger(__name__)
 
 
 class WebhookIn(BaseModel):
@@ -60,14 +63,20 @@ def webhook(body: WebhookIn, x_webhook_secret: str = Header(default="")):
         valid_url = False
     if not valid_url:
         raise HTTPException(422, "reply_url must target the configured helpdesk origin and ticket")
-    with SessionLocal.begin() as db:
-        inserted = db.execute(insert(Event).values(event_id=body.event_id, ticket_id=body.ticket_id).on_conflict_do_nothing(index_elements=["event_id"]).returning(Event.event_id)).scalar_one_or_none()
-        if inserted:
-            db.execute(insert(Ticket).values(ticket_id=body.ticket_id, customer_email=str(body.customer_email), message=body.message, reply_url=body.reply_url, status="queued").on_conflict_do_nothing(index_elements=["ticket_id"]))
-        else:
-            prior = db.get(Event, body.event_id)
-            if prior.ticket_id != body.ticket_id:
-                raise HTTPException(409, "event_id already belongs to another ticket")
+    try:
+        with SessionLocal.begin() as db:
+            db.execute(text("SET LOCAL lock_timeout = '300ms'"))
+            db.execute(text("SET LOCAL statement_timeout = '700ms'"))
+            inserted = db.execute(insert(Event).values(event_id=body.event_id, ticket_id=body.ticket_id).on_conflict_do_nothing(index_elements=["event_id"]).returning(Event.event_id)).scalar_one_or_none()
+            if inserted:
+                db.execute(insert(Ticket).values(ticket_id=body.ticket_id, customer_email=str(body.customer_email), message=body.message, reply_url=body.reply_url, status="queued").on_conflict_do_nothing(index_elements=["ticket_id"]))
+            else:
+                prior = db.get(Event, body.event_id)
+                if prior.ticket_id != body.ticket_id:
+                    raise HTTPException(409, "event_id already belongs to another ticket")
+    except SQLAlchemyError as exc:
+        log.exception("Could not persist webhook event %s", body.event_id)
+        raise HTTPException(503, "Temporary database failure; retry delivery") from exc
     return {"accepted": True, "event_id": body.event_id}
 
 

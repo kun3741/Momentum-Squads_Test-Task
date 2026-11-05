@@ -9,7 +9,12 @@ def now():
     return datetime.now(timezone.utc)
 
 
-engine = create_engine(os.environ.get("DATABASE_URL", "postgresql+psycopg://support:localdev@localhost:5432/support"), pool_pre_ping=True)
+engine = create_engine(
+    os.environ.get("DATABASE_URL", "postgresql+psycopg://support:localdev@localhost:5432/support"),
+    pool_pre_ping=True,
+    pool_timeout=float(os.getenv("DB_POOL_TIMEOUT", "5")),
+    connect_args={"connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "5"))},
+)
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
 

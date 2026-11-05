@@ -1,9 +1,12 @@
 import httpx
+import pytest
+from sqlalchemy.exc import OperationalError
 
 from app import llm
+from app import main
+from fastapi import HTTPException
 from app.main import check_review_token, review_token
 from app.worker import valid_reply_url
-from fastapi import HTTPException
 
 
 def test_no_key_still_calls_provider_and_uses_delayed_fallback(monkeypatch):
@@ -66,3 +69,24 @@ def test_review_action_tokens_are_distinct(monkeypatch):
         assert exc.status_code == 403
     else:
         raise AssertionError("Wrong action token was accepted")
+
+
+def test_webhook_returns_retryable_error_when_database_is_unavailable(monkeypatch):
+    class UnavailableSessions:
+        def begin(self):
+            raise OperationalError("connect", {}, Exception("database unavailable"))
+
+    monkeypatch.setenv("WEBHOOK_SECRET", "test-secret")
+    monkeypatch.setenv("HELPDESK_ALLOWED_ORIGIN", "http://mock-helpdesk:8001")
+    monkeypatch.setattr(main, "SessionLocal", UnavailableSessions())
+    body = main.WebhookIn(
+        event_id="evt-db-down",
+        ticket_id="T-DB-DOWN",
+        customer_email="user@example.com",
+        message="PDF export failed",
+        reply_url="http://mock-helpdesk:8001/tickets/T-DB-DOWN/replies",
+    )
+    with pytest.raises(HTTPException) as error:
+        main.webhook(body, x_webhook_secret="test-secret")
+    assert error.value.status_code == 503
+    assert "retry" in error.value.detail

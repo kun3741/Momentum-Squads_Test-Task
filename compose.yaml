@@ -32,6 +32,8 @@ services:
       MOCK_LLM_DELAY_MIN: ${MOCK_LLM_DELAY_MIN:-5}
       MOCK_LLM_DELAY_MAX: ${MOCK_LLM_DELAY_MAX:-30}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-32}
+      DB_POOL_TIMEOUT: 0.25
+      DB_CONNECT_TIMEOUT: 1
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -41,7 +43,10 @@ services:
   worker:
     build: .
     command: python -m app.worker
-    environment: *env
+    environment:
+      <<: *env
+      DB_POOL_TIMEOUT: 5
+      DB_CONNECT_TIMEOUT: 5
     depends_on:
       init:
         condition: service_completed_successfully
@@ -49,7 +54,10 @@ services:
   mock-helpdesk:
     build: .
     command: uvicorn app.mock_helpdesk:app --host 0.0.0.0 --port 8001
-    environment: *env
+    environment:
+      <<: *env
+      DB_POOL_TIMEOUT: 5
+      DB_CONNECT_TIMEOUT: 5
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
