@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: support
+      POSTGRES_USER: support
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U support -d support"]
+      interval: 2s
+      retries: 20
+  init:
+    build: .
+    command: python -m app.init
+    environment:
+      DATABASE_URL: postgresql+psycopg://support:${POSTGRES_PASSWORD:-localdev}@db:5432/support
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build: .
+    environment: &env
+      DATABASE_URL: postgresql+psycopg://support:${POSTGRES_PASSWORD:-localdev}@db:5432/support
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-change-me}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-local-webhook-secret}
+      HELPDESK_ALLOWED_ORIGIN: http://mock-helpdesk:8001
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      MOCK_LLM_DELAY_MIN: ${MOCK_LLM_DELAY_MIN:-5}
+      MOCK_LLM_DELAY_MAX: ${MOCK_LLM_DELAY_MAX:-30}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-32}
+    ports:
+      - "8000:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  worker:
+    build: .
+    command: python -m app.worker
+    environment: *env
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  mock-helpdesk:
+    build: .
+    command: uvicorn app.mock_helpdesk:app --host 0.0.0.0 --port 8001
+    environment: *env
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+volumes:
+  pgdata:
