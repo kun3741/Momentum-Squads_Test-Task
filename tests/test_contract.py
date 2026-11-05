@@ -28,6 +28,23 @@ def test_no_key_still_calls_provider_and_uses_delayed_fallback(monkeypatch):
     assert "https://example.test/kb/pdf-export" in answer
 
 
+def test_real_model_draft_gets_retrieved_article_links(monkeypatch):
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"choices": [{"message": {"content": "Відкрийте експорт звіту."}}]}
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://example.test")
+    monkeypatch.setattr(llm.httpx, "post", lambda *args, **kwargs: Response())
+    answer = llm.generate("PDF", [(1, 1, "pdf-export", "Експорт PDF", "Відкрийте експорт")])
+
+    assert "Відкрийте експорт звіту." in answer
+    assert "Експорт PDF: https://example.test/kb/pdf-export" in answer
+
+
 def test_reply_destination_must_match_configured_ticket(monkeypatch):
     monkeypatch.setenv("HELPDESK_ALLOWED_ORIGIN", "http://mock-helpdesk:8001")
     assert valid_reply_url("http://mock-helpdesk:8001/tickets/T-1/replies", "T-1")

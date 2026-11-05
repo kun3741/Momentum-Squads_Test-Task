@@ -9,6 +9,14 @@ def article_url(slug: str) -> str:
     return f"{os.getenv('PUBLIC_BASE_URL', 'http://localhost:8000').rstrip('/')}/kb/{slug}"
 
 
+def attach_sources(answer: str, articles: list[tuple]) -> str:
+    missing = [(title, article_url(slug)) for _, _, slug, title, _ in articles if article_url(slug) not in answer]
+    if not missing:
+        return answer
+    sources = "\n".join(f"- {title}: {url}" for title, url in missing)
+    return f"{answer.rstrip()}\n\nСтатті бази знань:\n{sources}"
+
+
 def generate(message: str, articles: list[tuple]) -> str:
     context = "\n".join(f"{title}: {body} (джерело: {article_url(slug)})" for _, _, slug, title, body in articles)
     prompt = ("Ти оператор підтримки Orbita. Напиши коротку українську чернетку відповіді. "
@@ -28,7 +36,7 @@ def generate(message: str, articles: list[tuple]) -> str:
         if key:
             result = response.json()["choices"][0]["message"]["content"].strip()
             if result:
-                return result
+                return attach_sources(result, articles)
         else:
             raise RuntimeError("Provider response without API key is intentionally replaced")
     except Exception:
