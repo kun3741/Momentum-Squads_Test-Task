@@ -27,15 +27,16 @@ def setting(name, default):
 
 BASE = setting("BASE_URL", "http://localhost:8000")
 MOCK = setting("MOCK_BASE_URL", "http://localhost:8001")
+REPLY_ORIGIN = setting("HELPDESK_ALLOWED_ORIGIN", "http://mock-helpdesk:8001")
 PASSWORD = setting("OPERATOR_PASSWORD", "change-me")
 SECRET = setting("WEBHOOK_SECRET", "local-webhook-secret")
 AUTH = "Basic " + base64.b64encode(f"operator:{PASSWORD}".encode()).decode()
 
 
-def request(method, url, body=None, headers=None, timeout=10):
+def request(method, url, body=None, headers=None, timeout=10, form=False):
     data = None
     sent_headers = dict(headers or {})
-    if isinstance(body, dict):
+    if isinstance(body, dict) and not form:
         data = json.dumps(body).encode()
         sent_headers["Content-Type"] = "application/json"
     elif body is not None:
@@ -74,13 +75,13 @@ def replies(ticket_id):
 
 def approve(ticket):
     token = hmac.new(PASSWORD.encode(), f"{ticket['id']}:approve".encode(), hashlib.sha256).hexdigest()
-    code, body = request("POST", f"{BASE}/tickets/{ticket['id']}/approve", {"draft": ticket["draft"], "review_token": token}, {"Authorization": AUTH})
+    code, body = request("POST", f"{BASE}/tickets/{ticket['id']}/approve", {"draft": ticket["draft"], "review_token": token}, {"Authorization": AUTH}, form=True)
     assert code == 200, body  # urllib follows the 303 redirect to the dashboard.
 
 
 def reject(ticket):
     token = hmac.new(PASSWORD.encode(), f"{ticket['id']}:reject".encode(), hashlib.sha256).hexdigest()
-    code, body = request("POST", f"{BASE}/tickets/{ticket['id']}/reject", {"review_token": token}, {"Authorization": AUTH})
+    code, body = request("POST", f"{BASE}/tickets/{ticket['id']}/reject", {"review_token": token}, {"Authorization": AUTH}, form=True)
     assert code == 200, body
 
 
@@ -95,7 +96,7 @@ def main():
         "ticket_id": ticket_id,
         "customer_email": "customer@example.com",
         "message": "Не можу експортувати звіт у PDF",
-        "reply_url": f"http://mock-helpdesk:8001/tickets/{ticket_id}/replies",
+        "reply_url": f"{REPLY_ORIGIN}/tickets/{ticket_id}/replies",
     }
 
     def deliver(_):
@@ -118,7 +119,7 @@ def main():
     timeout_ticket = "T-timeout-" + suffix
     set_scenario(timeout_ticket, "timeout-after-write")
     timeout_payload = dict(payload, event_id="evt-timeout-" + suffix, ticket_id=timeout_ticket,
-                           reply_url=f"http://mock-helpdesk:8001/tickets/{timeout_ticket}/replies")
+                           reply_url=f"{REPLY_ORIGIN}/tickets/{timeout_ticket}/replies")
     code, body = request("POST", BASE + "/webhooks/helpdesk", timeout_payload, {"X-Webhook-Secret": SECRET})
     assert code == 202, body
     approve(wait_for(timeout_ticket, "draft"))
@@ -132,7 +133,7 @@ def main():
     failing_ticket = "T-5xx-" + suffix
     set_scenario(failing_ticket, "500")
     failing_payload = dict(payload, event_id="evt-5xx-" + suffix, ticket_id=failing_ticket,
-                           reply_url=f"http://mock-helpdesk:8001/tickets/{failing_ticket}/replies")
+                           reply_url=f"{REPLY_ORIGIN}/tickets/{failing_ticket}/replies")
     code, body = request("POST", BASE + "/webhooks/helpdesk", failing_payload, {"X-Webhook-Secret": SECRET})
     assert code == 202, body
     approve(wait_for(failing_ticket, "draft"))
@@ -145,7 +146,7 @@ def main():
 
     rejected_ticket = "T-rejected-" + suffix
     rejected_payload = dict(payload, event_id="evt-rejected-" + suffix, ticket_id=rejected_ticket,
-                            reply_url=f"http://mock-helpdesk:8001/tickets/{rejected_ticket}/replies")
+                            reply_url=f"{REPLY_ORIGIN}/tickets/{rejected_ticket}/replies")
     code, body = request("POST", BASE + "/webhooks/helpdesk", rejected_payload, {"X-Webhook-Secret": SECRET})
     assert code == 202, body
     reject(wait_for(rejected_ticket, "draft"))
