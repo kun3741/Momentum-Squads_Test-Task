@@ -26,6 +26,8 @@ def create_reply(ticket_id: str, body: ReplyIn, idempotency_key: str = Header(al
         raise HTTPException(400, "Ticket mismatch")
     with SessionLocal.begin() as db:
         scenario = db.get(MockScenario, ticket_id)
+        if scenario and scenario.mode == "400":
+            raise HTTPException(400, "Injected permanent failure")
         if scenario and scenario.mode == "500":
             raise HTTPException(503, "Injected failure")
         stmt = insert(MockReply).values(ticket_id=ticket_id, idempotency_key=idempotency_key, message=body.message).on_conflict_do_nothing(index_elements=["ticket_id", "idempotency_key"])
@@ -45,7 +47,7 @@ def create_reply(ticket_id: str, body: ReplyIn, idempotency_key: str = Header(al
 def set_scenario(ticket_id: str, body: ScenarioIn, x_mock_admin_secret: str = Header(default="")):
     if x_mock_admin_secret != os.getenv("WEBHOOK_SECRET", "local-webhook-secret"):
         raise HTTPException(401)
-    if body.mode not in ("normal", "500", "timeout-after-write"):
+    if body.mode not in ("normal", "400", "500", "timeout-after-write"):
         raise HTTPException(422)
     with SessionLocal.begin() as db:
         db.execute(insert(MockScenario).values(ticket_id=ticket_id, mode=body.mode).on_conflict_do_update(index_elements=["ticket_id"], set_={"mode": body.mode}))

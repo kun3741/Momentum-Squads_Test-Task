@@ -4,6 +4,7 @@ from sqlalchemy.exc import OperationalError
 
 from app import llm
 from app import main
+from app import worker
 from fastapi import HTTPException
 from app.main import check_review_token, review_token
 from app.worker import valid_reply_url
@@ -90,3 +91,40 @@ def test_webhook_returns_retryable_error_when_database_is_unavailable(monkeypatc
         main.webhook(body, x_webhook_secret="test-secret")
     assert error.value.status_code == 503
     assert "retry" in error.value.detail
+
+
+def test_provider_auth_failure_stops_automatic_generation(monkeypatch):
+    failures = []
+    retries = []
+    monkeypatch.setattr(worker, "reserve_llm_slot", lambda: True)
+    monkeypatch.setattr(worker, "find_relevant", lambda message: [])
+    monkeypatch.setattr(worker, "fail", lambda *args: failures.append(args))
+    monkeypatch.setattr(worker, "retry", lambda *args: retries.append(args))
+
+    def unauthorized(*args):
+        request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+        raise httpx.HTTPStatusError("401", request=request, response=httpx.Response(401, request=request))
+
+    monkeypatch.setattr(worker, "generate", unauthorized)
+    worker.process((1, "lease", "generate", "message", "", "T-1", None))
+    assert len(failures) == 1
+    assert failures[0][2] == "generate"
+    assert retries == []
+
+
+@pytest.mark.parametrize("code,permanent", [(302, True), (400, True), (408, False), (429, False), (503, False)])
+def test_helpdesk_response_classification(monkeypatch, code, permanent):
+    failures = []
+    retries = []
+    monkeypatch.setenv("HELPDESK_ALLOWED_ORIGIN", "http://mock-helpdesk:8001")
+    monkeypatch.setattr(worker, "fail", lambda *args: failures.append(args))
+    monkeypatch.setattr(worker, "retry", lambda *args: retries.append(args))
+
+    def response(*args, **kwargs):
+        request = httpx.Request("POST", args[0])
+        return httpx.Response(code, request=request)
+
+    monkeypatch.setattr(worker.httpx, "post", response)
+    worker.process((1, "lease", "send", "message", "http://mock-helpdesk:8001/tickets/T-1/replies", "T-1", "draft"))
+    assert len(failures) == int(permanent)
+    assert len(retries) == int(not permanent)

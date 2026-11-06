@@ -104,6 +104,9 @@ def dashboard(page: int = Query(default=1, ge=1)):
                 parts.append(f"<p>Помилка: {escape(ticket.error)}</p>")
             if ticket.status == "draft":
                 parts.append(f"<form method='post' action='/tickets/{ticket.id}/approve'><input type='hidden' name='review_token' value='{review_token(ticket.id, 'approve')}'><textarea name='draft' rows='6' cols='90'>{escape(ticket.draft or '')}</textarea><br><button>Підтвердити й надіслати</button></form><form method='post' action='/tickets/{ticket.id}/reject'><input type='hidden' name='review_token' value='{review_token(ticket.id, 'reject')}'><button>Відхилити</button></form>")
+            if ticket.status in ("generation_failed", "send_failed"):
+                label = "Повторити генерацію" if ticket.status == "generation_failed" else "Повторити надсилання"
+                parts.append(f"<form method='post' action='/tickets/{ticket.id}/retry'><input type='hidden' name='review_token' value='{review_token(ticket.id, 'retry')}'><button>{label}</button></form>")
             parts.append("</article>")
         if page > 1:
             parts.append(f"<a href='/?page={page - 1}'>Новіші</a> ")
@@ -149,4 +152,20 @@ def reject(ticket_pk: int, review_token: str = Form(...)):
         if ticket.status != "draft":
             raise HTTPException(409, "Ticket is not awaiting review")
         ticket.status = "rejected"
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/tickets/{ticket_pk}/retry", dependencies=[Depends(operator)])
+def retry_failed(ticket_pk: int, review_token: str = Form(...)):
+    check_review_token(ticket_pk, "retry", review_token)
+    with SessionLocal.begin() as db:
+        ticket = db.get(Ticket, ticket_pk, with_for_update=True)
+        if not ticket:
+            raise HTTPException(404)
+        if ticket.status not in ("generation_failed", "send_failed"):
+            raise HTTPException(409, "Ticket has no permanent failure")
+        ticket.status = "queued" if ticket.status == "generation_failed" else "approved"
+        ticket.error = None
+        ticket.next_attempt_at = now()
+        ticket.attempts = 0
     return RedirectResponse("/", status_code=303)

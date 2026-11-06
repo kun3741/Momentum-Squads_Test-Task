@@ -85,6 +85,12 @@ def reject(ticket):
     assert code == 200, body
 
 
+def retry_failed(ticket):
+    token = hmac.new(PASSWORD.encode(), f"{ticket['id']}:retry".encode(), hashlib.sha256).hexdigest()
+    code, body = request("POST", f"{BASE}/tickets/{ticket['id']}/retry", {"review_token": token}, {"Authorization": AUTH}, form=True)
+    assert code == 200, body
+
+
 def main():
     code, body = request("GET", BASE + "/health")
     assert (code, body) == (200, "OK")
@@ -143,6 +149,21 @@ def main():
     wait_for(failing_ticket, "sent", timeout=60)
     assert len(replies(failing_ticket)) == 1
     print("PASS: 5xx is retried after the mock recovers")
+
+    permanent_ticket = "T-4xx-" + suffix
+    set_scenario(permanent_ticket, "400")
+    permanent_payload = dict(payload, event_id="evt-4xx-" + suffix, ticket_id=permanent_ticket,
+                             reply_url=f"{REPLY_ORIGIN}/tickets/{permanent_ticket}/replies")
+    code, body = request("POST", BASE + "/webhooks/helpdesk", permanent_payload, {"X-Webhook-Secret": SECRET})
+    assert code == 202, body
+    approve(wait_for(permanent_ticket, "draft"))
+    failed = wait_for(permanent_ticket, "send_failed", timeout=30, require_error=True)
+    assert replies(permanent_ticket) == []
+    set_scenario(permanent_ticket, "normal")
+    retry_failed(failed)
+    wait_for(permanent_ticket, "sent", timeout=30)
+    assert len(replies(permanent_ticket)) == 1
+    print("PASS: permanent 4xx stops automatic retries and operator can resume sending")
 
     rejected_ticket = "T-rejected-" + suffix
     rejected_payload = dict(payload, event_id="evt-rejected-" + suffix, ticket_id=rejected_ticket,

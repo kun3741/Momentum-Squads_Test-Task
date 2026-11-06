@@ -77,6 +77,26 @@ def retry(ticket_pk, token, stage, error, delay=None):
         ticket.lease_token = None
 
 
+def fail(ticket_pk, token, stage, error):
+    with SessionLocal.begin() as db:
+        ticket = db.get(Ticket, ticket_pk, with_for_update=True)
+        if not ticket or ticket.lease_token != token:
+            return
+        ticket.status = "generation_failed" if stage == "generate" else "send_failed"
+        ticket.error = str(error)[:1000]
+        ticket.lease_until = None
+        ticket.lease_token = None
+
+
+def is_permanent_error(error):
+    if isinstance(error, (ValueError, KeyError, IndexError, TypeError)):
+        return True
+    if isinstance(error, httpx.HTTPStatusError):
+        code = error.response.status_code
+        return 300 <= code < 500 and code not in (408, 429)
+    return False
+
+
 def valid_reply_url(url, ticket_id):
     try:
         parsed = urlsplit(url)
@@ -103,11 +123,14 @@ def process(job):
                 raise ValueError("Reply URL origin is not allowed")
             response = httpx.post(reply_url, json={"ticket_id": ticket_id, "message": draft}, headers={"Idempotency-Key": f"reply:{ticket_id}"}, timeout=5)
             if response.status_code != 201:
-                raise RuntimeError(f"Helpdesk returned {response.status_code}: {response.text[:200]}")
+                raise httpx.HTTPStatusError(f"Helpdesk returned {response.status_code}: {response.text[:200]}", request=response.request, response=response)
             complete(ticket_pk, token, stage)
     except Exception as exc:
         log.exception("Ticket %s %s failed", ticket_id, stage)
-        retry(ticket_pk, token, stage, exc)
+        if is_permanent_error(exc):
+            fail(ticket_pk, token, stage, exc)
+        else:
+            retry(ticket_pk, token, stage, exc)
 
 
 def main():
