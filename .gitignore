@@ -2,6 +2,7 @@
 .venv/
 .deps/
 .tools/
+.cache/
 .pgdata/
 __pycache__/
 .pytest_cache/
