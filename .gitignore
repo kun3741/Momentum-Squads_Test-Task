@@ -3,6 +3,7 @@
 .deps/
 .tools/
 .cache/
+acme/
 .pgdata/
 __pycache__/
 .pytest_cache/
