@@ -63,7 +63,7 @@ curl -i http://127.0.0.1:18000/ready
 journalctl -u orbita-tunnel --no-pager | grep -Eo 'https://[a-z-]+\.trycloudflare\.com' | tail -n 1
 ```
 
-- Вебхук: `<адреса>/webhooks/helpdesk` з `X-Webhook-Secret`; інтерфейс: `<адреса>/` з HTTP Basic користувачем `operator`.
+- Вебхук: `<адреса>/webhooks/helpdesk` з `X-Webhook-Secret`; інтерфейс: `<адреса>/` з HTTP Basic користувачем `operator`. Для синтетичного вебхука на VPS поле `reply_url` має дорівнювати `http://127.0.0.1:18001/tickets/{ticket_id}/replies`: це адреса мока, яку перевіряє allowlist сервісу.
 - Пароль оператора та секрет вебхука згенеровані випадково **на VPS** і лежать тільки в `/etc/orbita-support.env` (`root:orbita`, `0640`). Власник може переглянути потрібне значення у власному SSH-терміналі командами `sudo grep '^OPERATOR_PASSWORD=' /etc/orbita-support.env` і `sudo grep '^WEBHOOK_SECRET=' /etc/orbita-support.env`. Не надсилайте їх у чат і не додавайте до Git.
 - Локальна перевірка: `curl -i http://127.0.0.1:18000/ready`; стан: `systemctl is-active postgresql orbita-api orbita-worker orbita-mock orbita-tunnel`; журнали: `journalctl -u orbita-worker -n 100 --no-pager`.
 - Після запуску локальний і публічний `tests/integration.py` пройшли п'ять сценаріїв: одночасні дублікати вебхука, модерація з одним надсиланням, таймаут після запису, відновлення після `5xx`, ручний повтор після `400` та відхилення чернетки. У БД лише синтетичні звернення з `customer@example.com`.
