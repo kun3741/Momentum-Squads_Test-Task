@@ -1,0 +1,22 @@
+[Unit]
+Description=Orbita mock helpdesk
+After=orbita-init.service
+Requires=orbita-init.service
+
+[Service]
+User=orbita
+Group=orbita
+WorkingDirectory=/srv/orbita-support
+EnvironmentFile=/etc/orbita-support.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/env DB_POOL_TIMEOUT=5 DB_CONNECT_TIMEOUT=5 /srv/orbita-support/.venv/bin/uvicorn app.mock_helpdesk:app --host 127.0.0.1 --port 18001
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
+

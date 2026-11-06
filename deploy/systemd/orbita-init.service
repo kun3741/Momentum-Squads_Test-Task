@@ -1,0 +1,17 @@
+[Unit]
+Description=Initialize Orbita support database
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=orbita
+Group=orbita
+WorkingDirectory=/srv/orbita-support
+EnvironmentFile=/etc/orbita-support.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/orbita-support/.venv/bin/python -m app.init
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5
+

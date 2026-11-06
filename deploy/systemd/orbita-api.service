@@ -1,0 +1,22 @@
+[Unit]
+Description=Orbita support API
+After=orbita-init.service
+Requires=orbita-init.service
+
+[Service]
+User=orbita
+Group=orbita
+WorkingDirectory=/srv/orbita-support
+EnvironmentFile=/etc/orbita-support.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/orbita-support/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 18000
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
+
