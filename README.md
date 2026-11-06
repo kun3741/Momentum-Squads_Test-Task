@@ -91,4 +91,4 @@ GitHub Actions запускає ці перевірки та інтеграці�
 
 ## Запуск на VPS
 
-На VPS сервіс розгорнуто **без Docker**: PostgreSQL 16, окреме Python-середовище, systemd-сервіси та безкоштовний Cloudflare Quick Tunnel. Docker Compose лишається для локального запуску й CI. Актуальну тимчасову публічну адресу, порядок перевірки, секрети й обмеження тунелю описано в [DEPLOY_VPS.md](DEPLOY_VPS.md). Домен Quick Tunnel змінюється після його перезапуску; для постійного URL знадобиться іменований тунель і власний домен.
+На VPS сервіс розгорнуто **без Docker**: PostgreSQL 16, окреме Python-середовище, systemd-сервіси та власний HTTPS vhost у наявному nginx. Публічна адреса — [https://orbita.104-207-90-199.sslip.io/](https://orbita.104-207-90-199.sslip.io/); hostname залишається сталим, доки IP VPS не зміниться. Docker Compose лишається для локального запуску й CI. Порядок доступу та обслуговування описано в [DEPLOY_VPS.md](DEPLOY_VPS.md).
