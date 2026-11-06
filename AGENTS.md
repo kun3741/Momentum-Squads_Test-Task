@@ -17,4 +17,5 @@ This repository is a staged take-home backend exercise. The owner reviews each s
 - `python -m compileall -q app tests`
 - `python -m pytest -q tests/test_contract.py`
 - With Docker available: `docker compose up --build -d`, then `python tests/integration.py`.
+- Capacity scripts require a disposable database and explicit `RATE_TEST_ALLOWED=1` or `LOAD_TEST_ALLOWED=1`; never point them at a live service.
 - Report which checks actually ran. Local syntax checks do not establish that the PostgreSQL and HTTP paths work end to end.

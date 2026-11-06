@@ -82,6 +82,8 @@ PostgreSQL лічить початки LLM-викликів за рухомі 60
 
 Для локальних модульних тестів встановіть залежності з `requirements.txt` і виконайте `python -m pytest -q tests/test_contract.py`. Для швидкої перевірки синтаксису: `python -m compileall -q app tests`.
 
+Додаткові скрипти `tests/rate_limit.py` і `tests/load_webhooks.py` перевіряють ліміт 60 LLM-викликів та збереження 500 звернень. Вони потребують **окремої тестової БД** і явних `RATE_TEST_ALLOWED=1` / `LOAD_TEST_ALLOWED=1`, оскільки створюють записи. Результати виконання описані в [TESTING.md](TESTING.md).
+
 GitHub Actions запускає ці перевірки та інтеграційний сценарій у Docker Compose для кожного push у `main` і кожного pull request. Логи контейнерів зберігаються в журналі невдалого запуску.
 
 ## Підготовка до VPS
