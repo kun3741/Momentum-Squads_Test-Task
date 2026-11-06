@@ -2,7 +2,7 @@
 Description=Orbita Cloudflare Quick Tunnel
 After=network-online.target orbita-api.service
 Wants=network-online.target
-Requires=orbita-api.service
+Wants=orbita-api.service
 
 [Service]
 User=orbita
