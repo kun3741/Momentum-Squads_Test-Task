@@ -49,6 +49,17 @@ def health():
     return "OK"
 
 
+@app.get("/ready", response_class=PlainTextResponse)
+def ready():
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        log.warning("Readiness check could not reach PostgreSQL: %s", exc)
+        raise HTTPException(503, "PostgreSQL unavailable") from exc
+    return "OK"
+
+
 @app.post("/webhooks/helpdesk", status_code=202)
 def webhook(body: WebhookIn, x_webhook_secret: str = Header(default="")):
     if not hmac.compare_digest(x_webhook_secret, os.getenv("WEBHOOK_SECRET", "local-webhook-secret")):

@@ -17,7 +17,7 @@
 1. Створіть безкоштовний акаунт ngrok та знайдіть свій призначений dev-домен і authtoken. Не комітьте token і не надсилайте його в чат.
 2. У `.env` встановіть `NGROK_AUTHTOKEN` та `PUBLIC_BASE_URL=https://<ваш-dev-домен>`. Саме ця адреса з'явиться в посиланнях на статті, які отримають клієнти.
 3. Запустіть `docker compose --profile tunnel up --build -d`. Профіль запускає контейнер `ngrok/ngrok`, який спрямовує публічний HTTPS на `api:8000`. API й мок слухають хост лише на loopback; nginx та його порти 80/443 не змінюються.
-4. Перевірте `docker compose ps`, `docker compose logs --tail=100 ngrok api worker` та `curl -i http://127.0.0.1:8000/health`. Потім перевірте `https://<ваш-dev-домен>/health` із зовнішньої мережі.
+4. Перевірте `docker compose ps`, `docker compose logs --tail=100 ngrok api worker` та `curl -i http://127.0.0.1:8000/ready`. Потім перевірте `https://<ваш-dev-домен>/health` із зовнішньої мережі.
 5. Запустіть `python3 tests/integration.py` на VPS. Тест звертається до локальних портів 8000/8001, створює синтетичні звернення та перевіряє дублікати, модерацію й повтори. Після нього перевірте доступ оператора через HTTPS і посилання на статті в чернетці.
 
 Для короткої демонстрації без реєстрації існує [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/), але його випадковий домен змінюється після перезапуску. Тоді `PUBLIC_BASE_URL` і посилання в уже створених чернетках застаріють. Для цього сервісу стабільний домен кращий.

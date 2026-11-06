@@ -37,7 +37,7 @@ jobs:
           deadline = time.monotonic() + 90
           while time.monotonic() < deadline:
               try:
-                  with urllib.request.urlopen('http://localhost:8000/health', timeout=2) as response:
+                  with urllib.request.urlopen('http://localhost:8000/ready', timeout=2) as response:
                       if response.status == 200 and response.read() == b'OK':
                           break
               except Exception:

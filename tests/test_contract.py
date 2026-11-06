@@ -93,6 +93,29 @@ def test_webhook_returns_retryable_error_when_database_is_unavailable(monkeypatc
     assert "retry" in error.value.detail
 
 
+def test_readiness_reflects_database_connection(monkeypatch):
+    class AvailableSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, statement):
+            assert str(statement) == "SELECT 1"
+
+    monkeypatch.setattr(main, "SessionLocal", lambda: AvailableSession())
+    assert main.ready() == "OK"
+
+    def unavailable():
+        raise OperationalError("connect", {}, Exception("database unavailable"))
+
+    monkeypatch.setattr(main, "SessionLocal", unavailable)
+    with pytest.raises(HTTPException) as error:
+        main.ready()
+    assert error.value.status_code == 503
+
+
 def test_provider_auth_failure_stops_automatic_generation(monkeypatch):
     failures = []
     retries = []

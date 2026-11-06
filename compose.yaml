@@ -36,6 +36,11 @@ services:
       DB_CONNECT_TIMEOUT: 1
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read() == b'OK' else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
     depends_on:
       init:
         condition: service_completed_successfully

@@ -13,6 +13,7 @@
 1. Скопіюйте `.env.example` в `.env`. Для локальної перевірки можна лишити значення за замовчуванням. Перед публічним доступом задайте випадкові `POSTGRES_PASSWORD`, `OPERATOR_PASSWORD` і `WEBHOOK_SECRET` та HTTPS-адресу `PUBLIC_BASE_URL`.
 2. Виконайте `docker compose up --build -d` у корені репозиторію. Без `.env` Compose не запуститься: три основні секрети обов'язкові.
 3. Перевірте `http://localhost:8000/health`: відповідь має бути `200 OK` з тілом `OK`.
+   Для перевірки готовності до обробки запитів відкрийте `http://localhost:8000/ready`: він повертає `200 OK` лише коли доступний PostgreSQL, інакше `503`.
 4. Відкрийте `http://localhost:8000/`. HTTP Basic авторизація: користувач `operator`, пароль з `OPERATOR_PASSWORD` (локально `change-me`).
 5. Логи: `docker compose logs -f api worker mock-helpdesk`. Зупинка: `docker compose down`. Дані PostgreSQL лишаються в томі `pgdata`; `docker compose down -v` видалить їх.
 
@@ -48,6 +49,7 @@ Invoke-RestMethod -Uri http://localhost:8001/replies -Headers @{ 'X-Mock-Admin-S
 | Метод і шлях | Призначення | Авторизація |
 |---|---|---|
 | `GET /health` | `200` і текст `OK` | Немає |
+| `GET /ready` | `200 OK` при доступній БД, інакше `503` | Немає |
 | `POST /webhooks/helpdesk` | Зберегти подію, `202` | `X-Webhook-Secret` |
 | `GET /` | Список звернень і форми модерації | HTTP Basic |
 | `GET /api/tickets/{ticket_id}` | Стан і чернетка одного звернення | HTTP Basic |
@@ -85,7 +87,7 @@ PostgreSQL лічить початки LLM-викликів за рухомі 60
 
 Додаткові скрипти `tests/rate_limit.py` і `tests/load_webhooks.py` перевіряють ліміт 60 LLM-викликів та збереження 500 звернень. Вони потребують **окремої тестової БД** і явних `RATE_TEST_ALLOWED=1` / `LOAD_TEST_ALLOWED=1`, оскільки створюють записи. Результати виконання описані в [TESTING.md](TESTING.md).
 
-GitHub Actions запускає ці перевірки та інтеграційний сценарій у Docker Compose для кожного push у `main` і кожного pull request. Логи контейнерів зберігаються в журналі невдалого запуску.
+GitHub Actions запускає ці перевірки та інтеграційний сценарій у Docker Compose для кожного push у `main` і кожного pull request. Перед інтеграційним тестом він очікує `/ready`, а Compose використовує той самий ендпоінт для healthcheck API. Логи контейнерів зберігаються в журналі невдалого запуску.
 
 ## Підготовка до VPS
 
