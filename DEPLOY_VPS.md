@@ -9,10 +9,10 @@ HTTPS забезпечує окремий сертифікат Let's Encrypt д�
 - Docker на VPS не встановлювався. Код: `/srv/orbita-support`, Python-залежності: `.venv` у цьому каталозі.
 - PostgreSQL 16 має окремі роль `orbita` та БД `orbita_support`, слухає лише локально. Мок хелпдеску слухає `127.0.0.1:18001`, API — `127.0.0.1:18000`.
 - Довготривалі systemd-сервіси: `orbita-api`, `orbita-worker`, `orbita-mock`. Ініціалізація БД — `orbita-init`. Старий `orbita-tunnel` вимкнений; Quick Tunnel більше не використовується.
-- Nginx має **новий** файл `/etc/nginx/sites-available/orbita-support` і symlink у `sites-enabled`. У ньому тільки `server_name orbita.104-207-90-199.sslip.io` та proxy на `127.0.0.1:18000`. Конфіг `/etc/nginx/sites-available/existing-site`, бекенд на порту 3000 й `/opt/other-project` не редагувалися. [HTTP](deploy/nginx/orbita-http.conf) та [HTTPS](deploy/nginx/orbita-https.conf) шаблони зберігаються в Git.
+- Nginx має окремий файл `/etc/nginx/sites-available/orbita-support` і symlink у `sites-enabled`. У ньому тільки `server_name orbita.104-207-90-199.sslip.io` та proxy на `127.0.0.1:18000`. [HTTP](deploy/nginx/orbita-http.conf) та [HTTPS](deploy/nginx/orbita-https.conf) шаблони зберігаються в Git.
 - Секрети лежать лише в `/etc/orbita-support.env` з правами `root:orbita 0640`. Його зразок — [deploy/vps.env.example](deploy/vps.env.example); реальний файл не в Git.
 
-Перед першим nginx reload і після кожної зміни виконано `nginx -t`. Чинний other сайт [https://existing-site.example/](https://existing-site.example/) повернув `200` з тим самим розміром відповіді до й після. Orbita `/health` і `/ready` повертають `200`, інтерфейс без HTTP Basic — `401`.
+Перед першим nginx reload і після кожної зміни виконано `nginx -t`. Інші сайти на VPS залишилися доступними після оновлення конфігурації. Orbita `/health` і `/ready` повертають `200`, інтерфейс без HTTP Basic — `401`.
 
 ## Доступ оператора й тестовий вебхук
 
@@ -32,12 +32,12 @@ sudo grep '^WEBHOOK_SECRET=' /etc/orbita-support.env
 
 ```sh
 ssh <VPS_HOST>
-systemctl is-active nginx pm2-root postgresql orbita-api orbita-worker orbita-mock
+systemctl is-active nginx postgresql orbita-api orbita-worker orbita-mock
 curl -i http://127.0.0.1:18000/ready
 journalctl -u orbita-worker -n 100 --no-pager
 nginx -t
 ```
 
-Для оновлення коду спочатку перевірте `git -C /srv/orbita-support status --short`, потім використовуйте `git -C /srv/orbita-support pull --ff-only origin main`; Python-пакети встановлюйте лише в `/srv/orbita-support/.venv`. Перезапускайте тільки потрібні `orbita-*` сервіси. Якщо зміниться nginx-шаблон Orbita, перевірте `nginx -t` **до** `systemctl reload nginx` і потім перевірте обидва HTTPS-сайти. Не редагуйте файл `existing-site`.
+Для оновлення коду спочатку перевірте `git -C /srv/orbita-support status --short`, потім використовуйте `git -C /srv/orbita-support pull --ff-only origin main`; Python-пакети встановлюйте лише в `/srv/orbita-support/.venv`. Перезапускайте тільки потрібні `orbita-*` сервіси. Якщо зміниться nginx-шаблон Orbita, перевірте `nginx -t` **до** `systemctl reload nginx` і потім перевірте доступність сервісу та інших сайтів на VPS.
 
 `PUBLIC_BASE_URL=https://orbita.104-207-90-199.sslip.io` уже задано у конфігу VPS. Якщо IP зміниться, потрібно обрати новий hostname, випустити для нього окремий сертифікат, оновити vhost і `PUBLIC_BASE_URL`. Резервне копіювання `orbita_support` ще не налаштоване; до роботи з реальними клієнтськими даними його треба додати. Реальний хелпдеск також має підтримувати ідемпотентне надсилання за сталим ключем.
